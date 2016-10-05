@@ -1,37 +1,25 @@
-from neo4j.v1 import GraphDatabase, basic_auth
+from neo4jrestclient.client import GraphDatabase
 from IPython import embed
 from flask import g
 import yaml
 
-driver = GraphDatabase.driver("bolt://localhost", auth=basic_auth("neo4j", "letmein"))
+db = GraphDatabase("http://localhost:7474", username="neo4j", password="letmein")
 
 
-def get_db():
-    return driver.session()
-    #if not hasattr(g, 'neo4j_db'):
-    #    g.neo4j_db = driver.session()
-    #return g.neo4j_db
 
 
 def add_followings(followings):
     """
     Nodes
     """
-    db = get_db()
     results = list()
+    user = db.labels.create('User')
+    new_followings = list()
     for following in followings:
-        query = "CREATE (n: User { {properties} } )".format(properties=yaml.dump(following.obj))
-        """query = "CREATE (n: User {{ city:'{city}', comments_count:{comments_count}, " \
-                "description:'{description}', discogs_name:'{discogs_name}', first_name:'{first_name}', followers_count:" \
-                "{followers_count}, followings_count:{followings_count}, full_name:'{full_name}', id:{id}," \
-                "kind:'{kind}', last_modified:'{last_modified}', last_name:'{last_name}', likes_count:{likes_count}," \
-                "myspace_name:'{myspace_name}', online: '{online}', permalink: '{permalink}', permalink_url: '{permalink_url}'," \
-                "plan:'{plan}', playlist_count: {playlist_count}, public_favorites_count: {public_favorites_count}," \
-                "resposts_count: {reposts_count}, track_count: {track_count}, uri: '{uri}', name: '{username}', website: '{website}'," \
-                "website_title:'{website_title}' }})".format(**following.obj)
-        """
-        results.append(db.run(query))
-    embed()
+        new_followings.append(db.nodes.create(name=following.obj['username'], **following.obj))
+    # new_followings = [db.nodes.create(name=following.obj['username'], **following.obj) for following in followings]
+
+    user.add(*new_followings)
     return results
 
 
@@ -39,11 +27,19 @@ def add_edges(edges_list):
     """
     Edges
     """
-    db = get_db()
+    embed()
     for source, target in edges_list.items():
-        query = "({source})-[:FOLLOWS]->({target})".format(source=source, target=target)
-        results = db.run(query)
-    return results
+        id_index = db.nodes.indexes.create("id")
+        try:
+            src = next(id_index['id'][source])
+        except StopIteration:
+            print("stop iteration")
+            continue
+        except:
+            raise
+        for tgt in target:
+            trget = id_index.get('id')[tgt.id] # Figure out indexing
+            src.relationships.create("Follows", next(trget))
 
 
 """
