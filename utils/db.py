@@ -9,6 +9,16 @@ import soundcloud
 gdb = GraphDatabase("http://localhost:7474", username="neo4j", password="letmein")
 
 
+def add_user(sc_user, hub_user=False):
+    type = "HubUser" if hub_user else "User"
+    user = gdb.labels.create(type)
+    params = (sc_user.obj)
+    params.pop('quota')
+    params.pop('subscriptions')
+    node = gdb.nodes.create(name=sc_user.username, **params)
+    user.add(node)
+
+
 def add_followings(followings):
     """
     :param followings: List of soundcloud user objects
@@ -19,17 +29,11 @@ def add_followings(followings):
     new_followings = list()
     for following in followings:
         new_followings.append(gdb.nodes.create(name=following.obj['username'], **following.obj))
-    # new_followings = [db.nodes.create(name=following.obj['username'], **following.obj) for following in followings]
+
     user.add(*new_followings)
 
+def put_followers_in_db(client):
 
-def put_followers_in_db(sc_username, sc_pass):
-    client = soundcloud.Client(
-        client_id='8e906fb7c324fc6640fd3fc08ef9d1ff',
-        client_secret='aacd3a93bdfcf1dd65ed33497f091800',
-        username=sc_username,
-        password=sc_pass
-    )
     my_user = get_my_user(client)
     user_id = my_user.id
     my_followings = get_all_followings(client)
@@ -43,6 +47,7 @@ def put_followers_in_db(sc_username, sc_pass):
     # API call to get all followers for edges
     for follower in my_followings:
         follower_id = follower.id
+        add_hub_edge(user_id, follower_id) # Draw Edge from hub to User
         try:
             curr_followings = get_all_followings(client, follower_id)
         except:
@@ -65,6 +70,19 @@ def put_followers_in_db(sc_username, sc_pass):
                 add_edge(follower_id, following.id)
 
 
+def add_hub_edge(sid, tid):
+    """
+    :param sid: source id of the hub
+    :param tid:  target id of the node
+    :return:
+    """
+    query = "MATCH (t:HubUser {{id: {sid} }}), (p:User {{id: {tid} }}) " \
+        "MERGE (t)-[r:FOLLOWS]->(p) " \
+        "RETURN p, r, t".format(sid=sid, tid=tid)
+    result = gdb.query(q=query, returns=(client.Node, client.Relationship, client.Node))
+    return result
+
+
 def add_edge(sid, tid):
     """
     :param sid: source id of the node
@@ -72,10 +90,11 @@ def add_edge(sid, tid):
     :return:
     """
     query = "MATCH (t:User {{id: {sid} }}), (p:User {{id: {tid} }}) " \
-        "MERGE (p)-[r:FOLLOWS]->(t) " \
+        "MERGE (t)-[r:FOLLOWS]->(p) " \
         "RETURN p, r, t".format(sid=sid, tid=tid)
     result = gdb.query(q=query, returns=(client.Node, client.Relationship, client.Node))
     return result
+
 
 def add_edges(edges_list):
     """

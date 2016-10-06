@@ -2,7 +2,16 @@ import operator
 import networkx as nx
 import cypher
 import matplotlib.pyplot as plt
+import soundcloud
 
+def get_client(sc_username=None, sc_pass=None):
+    client = soundcloud.Client(
+        client_id='8e906fb7c324fc6640fd3fc08ef9d1ff',
+        client_secret='aacd3a93bdfcf1dd65ed33497f091800',
+        username=sc_username,
+        password=sc_pass
+    )
+    return client
 
 def get_all_followings(client, user_id=None):
     """
@@ -50,7 +59,7 @@ def get_neo4_graph():
     return results.get_graph()
 
 
-def draw_neo4j_graph():
+def get_and_draw_neo4j_graph():
     g = get_neo4_graph()
     nx.draw(g)
     plt.show()
