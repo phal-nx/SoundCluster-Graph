@@ -1,5 +1,7 @@
 import operator
 import networkx as nx
+import cypher
+import matplotlib.pyplot as plt
 
 
 def get_all_followings(client, user_id=None):
@@ -37,13 +39,34 @@ def get_stats(g):
     frequency_list = sorted(degree.items(), key=operator.itemgetter(1), reverse=True)
     cent = nx.degree_centrality(g)
     centrality = sorted(cent.items(), key=operator.itemgetter(1), reverse=True)
-    page = nx.pagerank(g)
-    page_rank = sorted(page.items(), key=operator.itemgetter(1), reverse=True)
+    #page = nx.pagerank(g)
+    #page_rank = sorted(page.items(), key=operator.itemgetter(1), reverse=True)
     return locals()
 
 
-def get_my_user_id(client):
+def get_neo4_graph():
+    query = "MATCH p = ()-[]-() RETURN p"
+    results = cypher.run(query, conn="http://neo4j:letmein@localhost:7474")
+    return results.get_graph()
 
+
+def draw_neo4j_graph():
+    g = get_neo4_graph()
+    nx.draw(g)
+    plt.show()
+
+
+def get_neighbor_count():
+    #Get neighbor count
+    return cypher.run("MATCH (n)--(m) RETURN n.username, count(m) as neighbors",
+                      conn="http://neo4j:letmein@localhost:7474")
+
+
+def get_my_user(client):
+    return client.get('/me')
+
+
+def get_my_user_id(client):
     return client.get('/me').id
 
 

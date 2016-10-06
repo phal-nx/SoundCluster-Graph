@@ -3,29 +3,37 @@ import getpass
 import pprint
 import pdb
 import networkx as nx
+
 import numpy as np
+
 import matplotlib.pyplot as plt
 import threading
 import json
 import multiprocessing.dummy
 import forceatlas
-from IPython import embed
+
 from utils.helpers import *
 from functools import partial
 from termcolor import colored
 from collections import defaultdict
 import utils.db as db
 
+
+
 sc_username = input(colored("Soundcloud Username:", "blue"))
 sc_pass = getpass.getpass(colored("Password:", "blue"))
 
-pp = pprint.PrettyPrinter(indent=4)
+
+db.put_followers_in_db(sc_username, sc_pass)
+
+
 client = soundcloud.Client(
     client_id='8e906fb7c324fc6640fd3fc08ef9d1ff',
     client_secret='aacd3a93bdfcf1dd65ed33497f091800',
     username=sc_username,
     password=sc_pass
 )
+
 user_id = get_my_user_id(client)
 my_followings = get_all_followings(client)
 
@@ -38,6 +46,7 @@ G.add_nodes_from(id_list.keys(), existing=True)
 
 # js FDG
 nodes = {user.id: {'id': user.id, 'label': user.username, 'weight': 1, 'group': 2 if user.followers_count > 500 else 1} for user in my_followings}
+
 # Neo4j Add Nodes
 db.add_followings(my_followings)
 
@@ -67,6 +76,8 @@ for follower in my_followings:
             links.append({'id': '{}->{}'.format(follower_id, following.id), 'source': follower_id,
                           'target': following.id, 'value': 1})  # JS FDG
             print('{} -> {}'.format(colored(follower.username, "red"), colored(following.username, 'cyan')))
+            x= db.add_edge(follower_id, following.id)
+
         # all non followed ppl
         G.add_nodes_from(not_existing_followings, existing=False)
         for following in not_existing_followings:
@@ -76,10 +87,8 @@ for follower in my_followings:
 # Neo4j Edges
 db.add_edges(edges_list)
 
-
+"""
 pos = forceatlas.forceatlas2_layout(G)
-
-
 # Extract x and y positions
 for uid, position in pos.items():
     # Gets the positions, multiplies by 5 then casts as an integer.
@@ -88,11 +97,4 @@ for uid, position in pos.items():
 nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'))
 nx.draw_networkx_edges(G, pos, edgelist=existing_followings, arrows=True, width=3, edge_color='r')
 nx.draw_networkx_edges(G, pos, edgelist=not_existing_followings, arrows=True, width=2, edge_color='rb')
-
-
-# JS FDG
-data = {"nodes": list(nodes.values()), "edges": links}
-with open('data.json', 'w') as outfile:
-    json.dump(data, outfile)
-embed()
-plt.show()
+"""
